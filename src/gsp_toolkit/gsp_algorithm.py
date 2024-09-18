@@ -1,103 +1,9 @@
-import pandas as pd
-import numpy as np
+from os import path, makedirs
 import time
-import json5 as json
 from collections import defaultdict
-import os
 from datetime import datetime
-
-def dataframe_gen(input_file_name, departments, run_mode, department_folder):
-    """
-    Generate a DataFrame from the input CSV file and filter based on departments and run mode.
-
-    Args:
-        input_file_name (str): The input CSV file name.
-        departments (list): List of department codes to filter.
-        run_mode (str): Run mode, either "separate" or "together."
-        department_folder (str): Directory where department-specific files will be stored.
-
-    Returns:
-        dict or tuple: Results based on run mode, either a dictionary for separate departments or a tuple for all together.
-    """
-    def process_department_data(df, department_folder):
-        """Process the data specific to a department, including sorting and resetting the index."""
-        df = df.reset_index(drop=True)
-    
-        sorted_df = df.sort_values(by = ['TermOrder', 'CourseCode'], ascending=True)
-        sorted_df = sorted_df.groupby(['SID']).agg({'CourseCode': lambda x: list(x),'TermOrder':lambda x: list(x)}).reset_index()
-        sorted_df = sorted_df.drop(columns=['SID'])
-        
-        transactions = len(sorted_df.index) + 1
-        
-        delimitor_df = insert_delimitor(sorted_df, department_folder)
-
-        return transactions, sorted_df, delimitor_df
-
-    df = pd.read_csv(input_file_name, dtype={'CourseCode': str}, low_memory=False)
-    df = df.loc[(df['Department'].isin(departments))]
-
-    if run_mode == "separate":
-        results = {}
-        for department in departments:
-            dfSub = df.loc[(df['Department'] == department)]
-            results[department] = process_department_data(dfSub, department_folder)
-        return results
-    elif run_mode == "together":
-        return process_department_data(df, department_folder)
-
-def insert_delimitor(df, department_folder):
-    """
-    Insert delimiters between different semesters in the course code.
-
-    Args:
-        df (DataFrame): The DataFrame containing the course codes.
-        department_folder (str): Directory where department-specific files will be stored.
-
-    Returns:
-        list: List of course codes with inserted delimiters.
-    """
-    course = [str(i).strip("[]").split(", ") for i in df.CourseCode]
-    semester = [str(i).strip("[]").split(", ") for i in df.TermOrder]
-
-    K_itemset = []
-    updated_elem1 = []
-    part1 = " "
-    
-    for i in range(len(semester)):
-        start = 0
-        elem1 = course[i]
-        term1 = semester[i]
-        item = term1[0]
-        if len(term1) == 1:
-            # only one course
-            K_itemset.append(elem1[0])
-        else:
-            # all courses in same semester
-            if len(set(term1)) == 1:
-                part1 = ','.join(elem1)
-                updated_elem1.append(part1)
-            else:
-                for j in range(0, len(term1)-1):
-                    item1 = float(term1[j])
-                    item2 = float(term1[j+1])
-                    if item1 < item2:
-                        part1 = ','.join(elem1[start:j+1])
-                        start = j + 1
-                        updated_elem1.append(part1)
-                part1 = ','.join(elem1[start:len(elem1)])
-                updated_elem1.append(part1)
-                
-            item = '|'.join(updated_elem1)
-            K_itemset.append(item)
-            updated_elem1.clear()
-    
-    d = {'CourseCode': K_itemset}
-    new_df = pd.DataFrame(d)
-    
-    transactions_delimiter_file_path = os.path.join(department_folder, 'transactions_delimiter.csv')
-    new_df.to_csv(transactions_delimiter_file_path)
-    
-    return(K_itemset) 
+from data_processing import dataframe_gen
+from utils import filter_and_export_to_csv, export_summary_to_file
 
 def join_itemsets(itemset):
     """
@@ -337,54 +243,6 @@ def apriori_algorithm(candidate_itemsets, min_support, k_value, dataframe):
     
     return results_dict
 
-def filter_and_export_to_csv(data_dict, min_support, total_transactions, file_name):
-    """
-    Filters and exports the provided data to a CSV file.
-
-    Args:
-        data_dict (dict): Dictionary containing the data to be exported.
-        min_support (float): Minimum support threshold.
-        total_transactions (int): Total number of transactions in the data.
-        file_name (str): Name of the CSV file to which data will be exported.
-
-    Returns:
-        dict: A dictionary containing the counts of itemsets.
-    """
-    data_df = pd.DataFrame(data_dict)
-   
-    for column in data_df:
-        data_df.drop(data_df[data_df[column] < min_support].index, inplace=True)
-    
-    itemset_counts = data_df.count().to_dict()
-    data_df['Count %'] = (data_df.sum(axis=1) / total_transactions) * 100
-    data_df.to_csv(file_name)
-    
-    return itemset_counts
-
-def export_summary_to_file(single_item_count, itemset_count, total_transactions, elapsed_time, file_path):
-    """
-    Exports a summary of the results to a text file.
-
-    Args:
-        single_item_count (dict): Dictionary containing the count of single items.
-        itemset_count (dict): Dictionary containing the count of itemsets of different sizes.
-        total_transactions (int): Total number of transactions in the data.
-        elapsed_time (float): Time taken to run the algorithm.
-        file_path (str): Path to the text file where the summary will be written.
-
-    Returns:
-        None
-    """
-    with open(file_path, 'a') as file:
-        file.write("===" * 20 + "\n")
-        file.write(json.dumps(single_item_count))
-        file.write("\n\n")
-        file.write(json.dumps(itemset_count))
-        file.write("\n\n")
-        file.write(f"Transaction #: {total_transactions}")
-        file.write("\n\n")
-        file.write(f"--- {elapsed_time} seconds ---\n\n")
-
 def run_apriori_on_data(df, new_df, transactions, minsupport, department_folder, department_name, start_time, output_path):
     """
     Run the Apriori algorithm on the given data and export the results.
@@ -421,9 +279,9 @@ def run_apriori_on_data(df, new_df, transactions, minsupport, department_folder,
 
     export_file_name = department_name + "_" + str(minsupport) + ".csv"
     department_export_dict = apriori_algorithm(Ck, minsupport, k, new_df)
-    k_count = filter_and_export_to_csv(department_export_dict, minsupport, transactions, os.path.join(department_folder, export_file_name))
+    k_count = filter_and_export_to_csv(department_export_dict, minsupport, transactions, path.join(department_folder, export_file_name))
     session = (time.time() - start_time)
-    export_summary_to_file(single_count, k_count, transactions, session, os.path.join(output_path, 'Export.txt'))
+    export_summary_to_file(single_count, k_count, transactions, session, path.join(output_path, 'Export.txt'))
 
     return export_file_name, department_export_dict, session
 
@@ -447,8 +305,8 @@ def run_separate_mode(departments, min_supports, input_file_name, output_path, r
     all_data = dataframe_gen(input_file_name, departments, run_mode_var, output_path)
 
     for department in departments:
-        department_folder = os.path.join(output_path, department)
-        os.makedirs(department_folder, exist_ok=True)
+        department_folder = path.join(output_path, department)
+        makedirs(department_folder, exist_ok=True)
 
         department_transactions, department_df, department_new_df = all_data[department]
 
@@ -483,8 +341,8 @@ def run_together_mode(departments, min_supports, input_file_name, output_path, r
     log_entries = []
 
     department_folder_name = "_".join(departments)
-    department_folder = os.path.join(output_path, department_folder_name)
-    os.makedirs(department_folder, exist_ok=True)
+    department_folder = path.join(output_path, department_folder_name)
+    makedirs(department_folder, exist_ok=True)
 
     transactions, df, new_df = dataframe_gen(input_file_name, departments, run_mode_var, department_folder)
 
@@ -521,8 +379,8 @@ def execute_tool(input_filename, support_thresholds, departments, run_mode, outp
 
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     output_folder = f"GSP_Run_{timestamp}"
-    output_path = os.path.join(output_dir, output_folder)
-    os.makedirs(output_path, exist_ok=True)
+    output_path = path.join(output_dir, output_folder)
+    makedirs(output_path, exist_ok=True)
 
     log_entries = []
 
@@ -531,7 +389,7 @@ def execute_tool(input_filename, support_thresholds, departments, run_mode, outp
     elif run_mode == "together":
         results, log_entries = run_together_mode(departments, support_thresholds, input_filename, output_path, run_mode)
 
-    log_filepath = os.path.join(output_path, "run_log.txt")
+    log_filepath = path.join(output_path, "run_log.txt")
     with open(log_filepath, 'w') as log_file:
         for entry in log_entries:
             log_file.write(entry + '\n')

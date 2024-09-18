@@ -1,8 +1,8 @@
-import argparse
-import sys
-import os
-import webbrowser
-from lab_code import execute_tool
+from os import getcwd
+from argparse import ArgumentParser, RawTextHelpFormatter
+from sys import argv, exit
+from webbrowser import open
+from gsp_algorithm import execute_tool
 
 def print_introduction():
     introduction_text = """
@@ -24,19 +24,19 @@ def print_introduction():
 def open_manual():
     manual_url = "https://docs.google.com/document/d/1yb6dg26jO_m0ir80vgfoN9ED0RF3bohMhJi0B3aig8w/edit?usp=sharing"
     print(f"Opening the manual: {manual_url}")
-    webbrowser.open(manual_url)
+    open(manual_url)
 
 def main():
-    if "--manual" in sys.argv:
+    if "--manual" in argv:
         open_manual()
-        sys.exit(0)
+        exit(0)
 
-    if len(sys.argv) == 1:
+    if len(argv) == 1:
         print_introduction()
-        sys.exit(1)
+        exit(1)
 
-    parser = argparse.ArgumentParser(description="Run the Apriori algorithm on transaction data. Analyze course sequences to identify common paths taken by students.",
-                                     formatter_class=argparse.RawTextHelpFormatter,
+    parser = ArgumentParser(description="Run the Apriori algorithm on transaction data. Analyze course sequences to identify common paths taken by students.",
+                                     formatter_class=RawTextHelpFormatter,
                                      epilog="""Examples:
     python gui.py --input_file data.csv --support_thresholds 50,100 --departments BISC,CHEM --run_mode separate
     python gui.py --input_file data.csv --support_thresholds 75 --departments MATH,PHYS --run_mode together --output_dir results/
@@ -47,7 +47,7 @@ For more detailed examples, use --manual.""")
     parser.add_argument("--support_thresholds", required=True, help="Comma-separated list of support thresholds. Example: 50,100")
     parser.add_argument("--departments", required=True, help="Comma-separated list of department codes. Include departments like BIO,CHEM.")
     parser.add_argument("--run_mode", choices=['separate', 'together'], required=False, default='separate', help="Run mode: 'separate' for analyzing departments separately, 'together' for combined analysis. Defaults to 'separate'.")
-    parser.add_argument("--output_dir", required=False, default=os.getcwd(), help="Directory to store output results. Defaults to current working directory if not specified.")
+    parser.add_argument("--output_dir", required=False, default=getcwd(), help="Directory to store output results. Defaults to current working directory if not specified.")
 
     # Parse the rest of the arguments
     args = parser.parse_args()

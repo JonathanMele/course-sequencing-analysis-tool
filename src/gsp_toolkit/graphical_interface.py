@@ -1,37 +1,13 @@
-import tkinter as tk
-from tkinter import filedialog
-from tkinter import ttk
-import csv
 import os
-import pandas as pd
+import csv
 import webbrowser
 import threading
-from lab_code import execute_tool
-
-# A class to create ToolTips
-class ToolTip:
-    def __init__(self, widget, text):
-        self.widget = widget
-        self.text = text
-        self.tooltip_window = None
-
-    def showtip(self):
-        # Method to show tooltip on hover
-        self.tooltip_window = tk.Toplevel(self.widget)
-        tooltip_label = tk.Label(self.tooltip_window, text=self.text)
-        tooltip_label.pack()
-
-        self.tooltip_window.overrideredirect(True)
-
-        x = self.widget.winfo_rootx() + 20
-        y = self.widget.winfo_rooty() + 20
-        self.tooltip_window.geometry(f"+{x}+{y}")
-
-    def hidetip(self):
-        # Method to hide tooltip when not hovering
-        if self.tooltip_window:
-            self.tooltip_window.destroy()
-            self.tooltip_window = None
+import tkinter as tk
+from tkinter import filedialog, ttk
+import pandas as pd
+from gsp_algorithm import execute_tool
+from data_processing import data_cleanup
+from utils import ToolTip, get_data_dictionary
 
 # The main class of the application
 class GSPTool:
@@ -45,14 +21,14 @@ class GSPTool:
         self.departments = set()
         self.select_all_var = tk.IntVar()
         self.run_mode_var = tk.StringVar(value="together")
-        self.root.title("Fordham EDM - CSAT")
+        self.root.title("Course Sequencing Analysis Tool")
         # Initialize all necessary UI elements as None, they will be defined in setup_gui
         self.departments_listbox = None
         self.run_mode_radio_together = None
         self.run_mode_radio_separate = None
         self.output_directory_label = None
         self.run_status_label = None
-        self.show_fordham_cleanup = False
+        self.show_cleanup = False
         self.progress = ttk.Progressbar(root, mode='indeterminate')
         self.setup_gui()    # Run GUI setup
 
@@ -62,8 +38,8 @@ class GSPTool:
         input_file_name_entry = tk.Entry(self.root, textvariable=self.input_file_name)
         input_file_name_entry.grid(row=0, column=1)
         tk.Button(self.root, text="Browse", command=self.browse_file).grid(row=0, column=2)
-        if self.show_fordham_cleanup:
-            tk.Button(self.root, bg="red", command=self.fordham_data_cleanup).grid(row=0 , column=3)
+        if self.show_cleanup:
+            tk.Button(self.root, bg="red", command=self.data_cleanup).grid(row=0 , column=3)
 
         self.bind_tooltip_events(input_file_name_entry, "Enter the path of the input file containing transaction data.")
 
@@ -120,35 +96,22 @@ class GSPTool:
         # Browse for an input file and update the departments list based on the file's contents
         file_path = filedialog.askopenfilename()
         self.input_file_name.set(file_path)
-        self.update_departments(file_path)
 
-    def fordham_data_cleanup(self):
-        # Fordham-specific data cleanup script
+        data_fields = get_data_dictionary()
+        required_keys = [key for key, value in data_fields.items() if value['required']]
+        with open(file_path, "r") as csvfile:
+            csv_reader = csv.DictReader(csvfile)
+            if not all(key in csv_reader.fieldnames for key in required_keys):
+                self.data_cleanup_wrapper()
+
+        self.update_departments(self.input_file_name.get())
+
+    def data_cleanup_wrapper(self):
+        # Wrapper method to integrate the cleanup function in the GUI
         input_file = self.input_file_name.get()
-        if input_file == "":
-            tk.messagebox.showwarning("No input file selected", "Please select an input file to run the tool on")
-        else:
-            df = pd.read_csv(input_file)
-            cols_to_keep = ['SID', 'Department', 'REG_Numbercode', 'REG_banTerm', 'REG_term', 'CRS_coursetitle', 'OTCM_FinalGradeC', 'OTCM_Crs_Graded', 'OTCM_FinalGradeN', 'TermOrder', 'CourseCode']
-
-            # Drop all the columns not in `cols_to_keep`
-            df = df.drop(columns=[col for col in df.columns if col not in cols_to_keep])
-
-            # Drop labs - specific to Fordham
-            df = df.drop(df[(df['CourseCode'] == 'CISC1610') | (df['CourseCode'] == 'CISC2010') | (df['CourseCode'] == 'CISC2110') 
-                            | (df['CourseCode'] == 'PHYS1511') | (df['CourseCode'] == 'PHYS1512') | (df['CourseCode'] == 'PHYS2010') | (df['CourseCode'] == 'PHYS2011') 
-                            | (df['CourseCode'] == 'BISC1413') | (df['CourseCode'] == 'BISC1414') | (df['CourseCode'] == 'BISC2549') | (df['CourseCode'] == 'BISC2571') 
-                            | (df['CourseCode'] == 'BISC3142') |(df['CourseCode'] == 'BISC3242') | (df['CourseCode'] == 'BISC3653') | (df['CourseCode'] == 'BISC3231') | (df['CourseCode'] == 'BISC3415')
-                            | (df['CourseCode'] == 'CHEM1331') | (df['CourseCode'] == 'CHEM1332')| (df['CourseCode'] == 'CHEM2531')| (df['CourseCode'] == 'CHEM2532')| (df['CourseCode'] == 'CHEM2541')
-                            | (df['CourseCode'] == 'CHEM2542')| (df['CourseCode'] == 'CHEM3631') | (df['CourseCode'] == 'CHEM3632') | (df['CourseCode'] == 'CHEM4231')| (df['CourseCode'] == 'CHEM4432')].index)
-            
-            df = df.drop(df[(df['OTCM_FinalGradeC'] == 'W') | (df['OTCM_FinalGradeC'] == 'INC')| (df['OTCM_FinalGradeC'] == 'HPCE') 
-                        | (df['OTCM_FinalGradeC'] == 'PCE')].index)
-            
-            df.rename(columns = {'OTCM_FinalGradeC':'FinalGrade', 'Department': 'Programcode', 'OTCM_FinalGradeN': 'FinalGradeN'})
-            print("DEBUG: Fordham data cleaned up!")
-            df.to_csv("cleaned_gsp_data.csv")
-            self.input_file_name.set(os.path.join(os.getcwd(), "cleaned_gsp_data.csv"))
+        cleaned_file_path = data_cleanup(input_file)
+        if cleaned_file_path:
+            self.input_file_name.set(cleaned_file_path)
 
     def update_departments(self, file_path):
         # Update the list of departments based on the contents of the selected input file
@@ -159,7 +122,12 @@ class GSPTool:
         with open(file_path, "r") as csvfile:
             csv_reader = csv.DictReader(csvfile)
             for row in csv_reader:
-                department = row["Department"]
+                if "Department" in row:
+                    department = row["Department"]
+                else:
+                    # separate the department from the course code (CISC2512->CISC)
+                    department = ''.join(filter(str.isalpha, row["CourseCode"]))
+
                 if department not in self.departments:
                     self.departments.add(department)
 
