@@ -84,13 +84,25 @@ def dataframe_gen(input_file_name, departments, run_mode, department_folder):
     def process_department_data(df, department_folder):
         """Process the data specific to a department, including sorting and resetting the index."""
         df = df.reset_index(drop=True)
-    
-        sorted_df = df.sort_values(by = ['TermOrder', 'CourseCode'], ascending=True)
-        sorted_df = sorted_df.groupby(['SID']).agg({'CourseCode': lambda x: list(x),'TermOrder':lambda x: list(x)}).reset_index()
+
+        # Assume TermOrder format is 'YYYYX' where X is the semester number (1 for spring, 2 for fall, etc.)
+        df['Year'] = df['TermOrder'].astype(str).str[:-1].astype(int)  # Extract the year
+        df['Semester'] = df['TermOrder'].astype(str).str[-1].astype(int)  # Extract the semester digit
+
+        # Now sort by Year first, then Semester, and finally CourseCode
+        sorted_df = df.sort_values(by=['Year', 'Semester', 'CourseCode'], ascending=[True, True, True])
+        
+        # Group by SID, collecting the CourseCode and TermOrder sequences
+        sorted_df = sorted_df.groupby(['SID']).agg({
+            'CourseCode': lambda x: list(x),
+            'TermOrder': lambda x: list(x),
+        }).reset_index()
+
+        # Drop the SID column, if needed
         sorted_df = sorted_df.drop(columns=['SID'])
-        
+
+        # Calculate transactions and insert delimiters
         transactions = len(sorted_df.index) + 1
-        
         delimitor_df = insert_delimitor(sorted_df, department_folder)
 
         return transactions, sorted_df, delimitor_df
