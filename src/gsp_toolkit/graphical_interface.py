@@ -101,7 +101,8 @@ class GSPTool:
         required_keys = [key for key, value in data_fields.items() if value['required']]
         with open(file_path, "r") as csvfile:
             csv_reader = csv.DictReader(csvfile)
-            if not all(key in csv_reader.fieldnames for key in required_keys):
+            # if required keys don't exist or the TermOrder column has value(s) less than 5 numbers
+            if not all(key in csv_reader.fieldnames for key in required_keys) or any(len(row['TermOrder']) < 5 for row in csv_reader):
                 self.data_cleanup_wrapper()
 
         self.update_departments(self.input_file_name.get())

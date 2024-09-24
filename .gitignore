@@ -31,3 +31,6 @@ htmlcov/
 .cache
 coverage.xml
 
+# Ignore tests folder
+tests/
+

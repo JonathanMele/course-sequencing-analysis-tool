@@ -45,6 +45,24 @@ def data_cleanup(input_file_path):
                 else:
                     print(f"Warning: Column '{user_input}' not found in the dataset. Skipping this field.")
     
+    # Edge case: If `Semester` and `Year` exist and the TermOrder has values less than 5 numbers, create new `TermOrder`
+    if 'Semester' in df.columns and 'Year' in df.columns and df['TermOrder'].astype(str).str.len().max() < 5:
+        def map_semester(semester):
+            if semester.lower() == 'spring':
+                return 0
+            elif semester.lower() == 'summer':
+                return 1
+            elif semester.lower() == 'fall':
+                return 2
+            else:
+                return None  # Handle unexpected values
+        
+        df['TermOrder'] = df.apply(lambda row: str(row['Year']) + str(map_semester(row['Semester'])), axis=1)
+        # show the new TermOrder
+        print("New TermOrder column has been created based on Year and Semester.")
+        print(df['TermOrder'])
+        df['TermOrder'] = df['TermOrder'].astype(int)
+        
     # Keep only the columns that were successfully mapped
     df = df[list(column_mapping.values())]
     
@@ -85,12 +103,13 @@ def dataframe_gen(input_file_name, departments, run_mode, department_folder):
         """Process the data specific to a department, including sorting and resetting the index."""
         df = df.reset_index(drop=True)
 
-        # Assume TermOrder format is 'YYYYX' where X is the semester number (1 for spring, 2 for fall, etc.)
+        # assume TermOrder format is 'YYYYX' where X is the semester number
         df['Year'] = df['TermOrder'].astype(str).str[:-1].astype(int)  # Extract the year
         df['Semester'] = df['TermOrder'].astype(str).str[-1].astype(int)  # Extract the semester digit
 
-        # Now sort by Year first, then Semester, and finally CourseCode
+        # sort by Year first, then Semester, and finally CourseCode
         sorted_df = df.sort_values(by=['Year', 'Semester', 'CourseCode'], ascending=[True, True, True])
+        # Now, we can do operations like filtering by year or grouping by semester
         
         # Group by SID, collecting the CourseCode and TermOrder sequences
         sorted_df = sorted_df.groupby(['SID']).agg({
@@ -98,10 +117,9 @@ def dataframe_gen(input_file_name, departments, run_mode, department_folder):
             'TermOrder': lambda x: list(x),
         }).reset_index()
 
-        # Drop the SID column, if needed
         sorted_df = sorted_df.drop(columns=['SID'])
 
-        # Calculate transactions and insert delimiters
+        # calculate transactions and insert delimiters
         transactions = len(sorted_df.index) + 1
         delimitor_df = insert_delimitor(sorted_df, department_folder)
 
