@@ -28,7 +28,7 @@ class GSPTool:
         self.run_mode_radio_separate = None
         self.output_directory_label = None
         self.run_status_label = None
-        self.show_cleanup = False
+        self.algorithm_type = "concurrent"
         self.progress = ttk.Progressbar(root, mode='indeterminate')
         self.setup_gui()    # Run GUI setup
 
