@@ -110,7 +110,8 @@ class GSPTool:
         timegroup_unit = get_timegroup_unit(gui=True)
 
         # Call the utility function to create the TimeGroup
-        self.file_df = create_timegroup(self.file_df, 'EventTime', timegroup_unit)
+        self.file_df, new_path = create_timegroup(self.file_df, 'EventTime', timegroup_unit)
+        self.input_file_name.set(new_path)
 
     def bind_tooltip_events(self, widget, text):
         tooltip = ToolTip(widget, text)

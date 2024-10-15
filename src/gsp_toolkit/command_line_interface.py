@@ -4,7 +4,8 @@ from sys import argv, exit
 from webbrowser import open
 from gsp_algorithm import execute_tool
 import pandas as pd
-from utils import preprocess_time
+from utils import preprocess_time, parse_dates, create_timegroup, get_timegroup_unit
+from os import path, makedirs
 
 def print_introduction():
     introduction_text = """
@@ -36,37 +37,52 @@ def main():
     if len(argv) == 1:
         print_introduction()
         exit(1)
+    
+    output_path = path.join(path.dirname(__file__), '..', '..', 'output')
+    makedirs(path.dirname(output_path), exist_ok=True)
 
     parser = ArgumentParser(description="Run the Apriori algorithm on transaction data. Analyze course sequences to identify common paths taken by students.",
                                      formatter_class=RawTextHelpFormatter,
                                      epilog="""Examples:
-    python gui.py --input_file data.csv --support_thresholds 50,100 --categories BISC,CHEM --run_mode separate
-    python gui.py --input_file data.csv --support_thresholds 75 --categories MATH,PHYS --run_mode together --output_dir results/
+    python command_line_interface.py -i data.csv -s 50,100 -c BISC,CHEM --m separate
+    python command_line_interface.py -i data.csv -s 75 -c MATH,PHYS -m together -o results/
 
 For more detailed examples, use --manual.""")
 
-    parser.add_argument("--input_file", required=True, help="Path to the input CSV file. Ensure the file is in CSV format.")
-    parser.add_argument("--support_thresholds", required=True, help="Comma-separated list of support thresholds. Example: 50,100")
-    parser.add_argument("--categories", required=False, help="Comma-separated list of categories. For departments, this is like BIO,CHEM.")
-    parser.add_argument("--run_mode", choices=['separate', 'together'], required=False, default='separate', help="Run mode: 'separate' for analyzing departments separately, 'together' for combined analysis. Defaults to 'separate'.")
-    parser.add_argument("--output_dir", required=False, default=getcwd(), help="Directory to store output results. Defaults to current working directory if not specified.")
+    parser.add_argument("-i", "--input", required=True, help="Input CSV file.")
+    parser.add_argument("-s", "--support", required=True, help="Comma-separated support thresholds (e.g., 50,100).")
+    parser.add_argument("-c", "--categories", required=False, help="Comma-separated categories (e.g., BIO,CHEM).")
+    parser.add_argument("-m", "--mode", choices=['separate', 'together'], default='separate', help="Run 'separate' or 'together'. Default: separate.")
+    parser.add_argument("-o", "--output", required=False, default=output_path, help="Output directory for results. Default: top-level output folder.")
+    parser.add_argument("--concurrency", action='store_true', help="Enable concurrency and prompt to create TimeGroup if not present.")
 
     # Parse the rest of the arguments
     args = parser.parse_args()
 
     # Convert string inputs to the correct format
-    support_thresholds = [float(threshold) for threshold in args.support_thresholds.split(",")]
+    support_thresholds = [float(threshold) for threshold in args.support.split(",")]
 
     if args.categories:
         categories = args.categories.split(",")
     else:
         categories = []
 
-    df = pd.read_csv(args.input_file)
-    cleaned_df = preprocess_time(df)
+    df = pd.read_csv(args.input)
+
+    if 'EventTime' not in df.columns:
+        df, _ = preprocess_time(df)
+    else:
+        df = parse_dates(df, 'EventTime')
+
+    # Check if concurrency is enabled
+    if args.concurrency:
+        if 'TimeGroup' not in df.columns:
+            # Prompt for TimeGroup unit if it does not exist
+            timegroup_unit = get_timegroup_unit()
+            df = create_timegroup(df, 'EventTime', timegroup_unit)
 
     # Execute the tool with the provided arguments
-    execute_tool(cleaned_df, support_thresholds, categories, args.run_mode, args.output_dir)
+    execute_tool(df, support_thresholds, categories, args.mode, args.output)
 
 if __name__ == "__main__":
     main()
