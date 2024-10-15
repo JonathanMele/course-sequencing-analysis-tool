@@ -57,16 +57,15 @@ class GSPTool:
         button_frame = tk.Frame(self.root)
         button_frame.grid(row=3, column=2, padx=10)
 
+        # Switch to using grid() for the checkbutton and radio buttons
         self.select_all_checkbox = tk.Checkbutton(button_frame, text="Select All", variable=self.select_all_var, command=self.select_all_categories)
-        self.select_all_checkbox.pack(side=tk.TOP, pady=2)
+        self.select_all_checkbox.grid(row=0, column=0, pady=2, sticky=tk.W)
 
         self.run_mode_radio_together = tk.Radiobutton(button_frame, text="Run Together", variable=self.run_mode_var, value="together")
-        self.run_mode_radio_together.pack(side=tk.TOP, pady=2)
-        self.run_mode_radio_together.config(state=tk.DISABLED)
+        self.run_mode_radio_together.grid(row=1, column=0, pady=2, sticky=tk.W)
 
         self.run_mode_radio_separate = tk.Radiobutton(button_frame, text="Run Separately", variable=self.run_mode_var, value="separate")
-        self.run_mode_radio_separate.pack(side=tk.TOP, pady=2)
-        self.run_mode_radio_separate.config(state=tk.DISABLED)
+        self.run_mode_radio_separate.grid(row=2, column=0, pady=2, sticky=tk.W)
 
         self.hide_category_widgets()
 

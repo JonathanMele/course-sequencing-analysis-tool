@@ -276,4 +276,4 @@ def preprocess_time(df, concurrency=False, gui=False):
     save_path = path.join(path.dirname(__file__), '..', '..', 'data')
     df = save_to_folder(df, save_path, 'preprocessed_data.csv')
 
-    return df, save_path
+    return df, save_path + '/preprocessed_data.csv'
