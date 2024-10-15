@@ -3,95 +3,14 @@ import pandas as pd
 from utils import get_data_dictionary
 
 def data_cleanup(input_file_path):
-    if not input_file_path:
-        print("No input file selected. Please select an input file to run the tool on.")
-        return None
+    return
 
-    # Load the dataset
-    df = pd.read_csv(input_file_path)
-
-    # Dictionary to store the column mappings
-    column_mapping = {}
-
-    print("Please provide the corresponding column names in your dataset for each required field.")
-    field_info = get_data_dictionary()
-    
-    # Loop over fields and prompt for user input
-    for field, info in field_info.items():
-        if info['required']:
-            # Required fields: Must get valid input
-            while True:
-                user_input = input(f"Enter the column name for '{field}' (Required): ").strip()
-                if user_input in df.columns:
-                    column_mapping[field] = user_input
-                    try:
-                        df[user_input] = df[user_input].astype(info['dtype'])
-                    except ValueError:
-                        print(f"Error: Could not convert column '{user_input}' to {info['dtype']}. Please ensure the data is formatted correctly.")
-                        continue
-                    break
-                else:
-                    print(f"Error: Column '{user_input}' not found in the dataset. Please try again.")
-        else:
-            # Optional fields: Can skip
-            user_input = input(f"Enter the column name for '{field}' (Optional, press Enter to skip): ").strip()
-            if user_input:
-                if user_input in df.columns:
-                    column_mapping[field] = user_input
-                    try:
-                        df[user_input] = df[user_input].astype(info['dtype'])
-                    except ValueError:
-                        print(f"Warning: Could not convert column '{user_input}' to {info['dtype']}. Skipping this field.")
-                else:
-                    print(f"Warning: Column '{user_input}' not found in the dataset. Skipping this field.")
-    
-    # Edge case: If `Semester` and `Year` exist and the TermOrder has values less than 5 numbers, create new `TermOrder`
-    if 'Semester' in df.columns and 'Year' in df.columns and df['TermOrder'].astype(str).str.len().max() < 5:
-        def map_semester(semester):
-            if semester.lower() == 'spring':
-                return 0
-            elif semester.lower() == 'summer':
-                return 1
-            elif semester.lower() == 'fall':
-                return 2
-            else:
-                return None  # Handle unexpected values
-        
-        df['TermOrder'] = df.apply(lambda row: str(row['Year']) + str(map_semester(row['Semester'])), axis=1)
-        # show the new TermOrder
-        print("New TermOrder column has been created based on Year and Semester.")
-        print(df['TermOrder'])
-        df['TermOrder'] = df['TermOrder'].astype(int)
-        
-    # Keep only the columns that were successfully mapped
-    df = df[list(column_mapping.values())]
-    
-    # Rename the columns to standard names 
-    df = df.rename(columns={v: k for k, v in column_mapping.items()})
-
-    # Apply Fordham-specific data cleanup
-    df = df.drop(df[df['CourseCode'].isin([
-        'CISC1610', 'CISC2010', 'CISC2110', 'PHYS1511', 'PHYS1512', 'PHYS2010', 'PHYS2011',
-        'BISC1413', 'BISC1414', 'BISC2549', 'BISC2571', 'BISC3142', 'BISC3242', 'BISC3653',
-        'BISC3231', 'BISC3415', 'CHEM1331', 'CHEM1332', 'CHEM2531', 'CHEM2532', 'CHEM2541',
-        'CHEM2542', 'CHEM3631', 'CHEM3632', 'CHEM4231', 'CHEM4432'])].index)
-
-    if 'FinalGrade' in df.columns:
-        df = df.drop(df[df['FinalGrade'].isin(['W', 'INC', 'HPCE', 'PCE'])].index)
-
-    # Save the cleaned data
-    cleaned_file_path = path.join(getcwd(), f"cleaned_{path.basename(input_file_path)}")
-    df.to_csv(cleaned_file_path, index=False)
-    print("Data has been cleaned and saved to:", cleaned_file_path)
-
-    return cleaned_file_path
-
-def dataframe_gen(input_file_name, departments, run_mode, department_folder):
+def dataframe_gen(df, departments, run_mode, department_folder):
     """
     Generate a DataFrame from the input CSV file and filter based on departments and run mode.
-
+z
     Args:
-        input_file_name (str): The input CSV file name.
+        df (DataFrame): The input DataFrame.
         departments (list): List of department codes to filter.
         run_mode (str): Run mode, either "separate" or "together."
         department_folder (str): Directory where department-specific files will be stored.
@@ -111,13 +30,13 @@ def dataframe_gen(input_file_name, departments, run_mode, department_folder):
         sorted_df = df.sort_values(by=['Year', 'Semester', 'CourseCode'], ascending=[True, True, True])
         # Now, we can do operations like filtering by year or grouping by semester
         
-        # Group by SID, collecting the CourseCode and TermOrder sequences
-        sorted_df = sorted_df.groupby(['SID']).agg({
+        # Group by ID, collecting the CourseCode and TermOrder sequences
+        sorted_df = sorted_df.groupby(['ID']).agg({
             'CourseCode': lambda x: list(x),
             'TermOrder': lambda x: list(x),
         }).reset_index()
 
-        sorted_df = sorted_df.drop(columns=['SID'])
+        sorted_df = sorted_df.drop(columns=['ID'])
 
         # calculate transactions and insert delimiters
         transactions = len(sorted_df.index) + 1
@@ -125,7 +44,6 @@ def dataframe_gen(input_file_name, departments, run_mode, department_folder):
 
         return transactions, sorted_df, delimitor_df
 
-    df = pd.read_csv(input_file_name, low_memory=False)
     df = df.loc[df['CourseCode'].str[:4].isin(departments)]
 
     if run_mode == "separate":

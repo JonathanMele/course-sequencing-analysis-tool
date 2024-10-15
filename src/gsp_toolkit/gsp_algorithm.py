@@ -3,7 +3,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from data_processing import dataframe_gen
-from utils import filter_and_export_to_csv, export_summary_to_file
+from utils import filter_and_export_to_csv, export_summary_to_file, generate_hash
 
 def join_itemsets(itemset):
     """
@@ -264,8 +264,8 @@ def run_apriori_on_data(df, new_df, transactions, minsupport, department_folder,
 
     single_count = defaultdict(int)
     set_count = defaultdict(int)
-    df['CourseCode'] = df['CourseCode'].astype(str)
-    row = [i.strip("[]").replace(", ", ",").split(",") for i in df['CourseCode']]
+    df['Item'] = df['Item'].astype(str)
+    row = [i.strip("[]").replace(", ", ",").split(",") for i in df['Item']]
 
     for i in range(len(row)):
         elem = row[i]
@@ -277,7 +277,9 @@ def run_apriori_on_data(df, new_df, transactions, minsupport, department_folder,
     freq_singles = prune_candidates(single_count, minsupport)
     Ck = join_itemsets(freq_singles)
 
-    export_file_name = department_name + "_" + str(minsupport) + ".csv"
+    department_hash = generate_hash(department_name + str(minsupport))
+    export_file_name = f"{department_hash}_{minsupport}.csv"
+
     department_export_dict = apriori_algorithm(Ck, minsupport, k, new_df)
     k_count = filter_and_export_to_csv(department_export_dict, minsupport, transactions, path.join(department_folder, export_file_name))
     session = (time.time() - start_time)
@@ -285,14 +287,14 @@ def run_apriori_on_data(df, new_df, transactions, minsupport, department_folder,
 
     return export_file_name, department_export_dict, session
 
-def run_separate_mode(departments, min_supports, input_file_name, output_path, run_mode_var):
+def run_separate_mode(departments, min_supports, input_df, output_path, run_mode_var):
     """
     Execute the Apriori algorithm for each department separately.
 
     Args:
         departments (list): List of department codes to process.
         min_supports (list): List of minimum support values.
-        input_file_name (str): The input CSV file name.
+        input_df (DataFrame): The input DataFrame containing the data to be processed.
         output_path (str): The directory where the results will be stored.
         run_mode_var (str): The running mode, should be "separate" in this case.
 
@@ -302,7 +304,7 @@ def run_separate_mode(departments, min_supports, input_file_name, output_path, r
     export_dict = {}
     log_entries = []
 
-    all_data = dataframe_gen(input_file_name, departments, run_mode_var, output_path)
+    all_data = dataframe_gen(input_df, departments, run_mode_var, output_path)
 
     for department in departments:
         department_folder = path.join(output_path, department)
@@ -323,14 +325,14 @@ def run_separate_mode(departments, min_supports, input_file_name, output_path, r
 
     return export_dict, log_entries
 
-def run_together_mode(departments, min_supports, input_file_name, output_path, run_mode_var):
+def run_together_mode(departments, min_supports, input_df, output_path, run_mode_var):
     """
     Execute the Apriori algorithm for all departments together.
 
     Args:
         departments (list): List of department codes to process.
         min_supports (list): List of minimum support values.
-        input_file_name (str): The input CSV file name.
+        input_df (DataFrame): The input DataFrame containing the data to be processed.
         output_path (str): The directory where the results will be stored.
         run_mode_var (str): The running mode, should be "together" in this case.
 
@@ -340,11 +342,13 @@ def run_together_mode(departments, min_supports, input_file_name, output_path, r
     export_dict = {}
     log_entries = []
 
-    department_folder_name = "_".join(departments)
+    departments_hash = generate_hash(f"{','.join(departments)}")
+    min_supports_hash = generate_hash(f"{','.join(map(str, min_supports))}")
+    department_folder_name = f"{departments_hash}_{min_supports_hash}"
     department_folder = path.join(output_path, department_folder_name)
     makedirs(department_folder, exist_ok=True)
 
-    transactions, df, new_df = dataframe_gen(input_file_name, departments, run_mode_var, department_folder)
+    transactions, df, new_df = dataframe_gen(input_df, departments, run_mode_var, department_folder)
 
     for minsupport in min_supports:
         start_time = time.time()
@@ -360,13 +364,13 @@ def run_together_mode(departments, min_supports, input_file_name, output_path, r
     return export_dict, log_entries
 
 
-def execute_tool(input_filename, support_thresholds, departments, run_mode, output_dir):
+def execute_tool(input_df, support_thresholds, departments, run_mode, output_dir):
     """
     Main function to execute the tool based on the selected mode. It orchestrates the execution of the algorithm,
     stores the results in the specified output directory, and logs the details of the execution.
 
     Args:
-        input_filename (str): The input CSV file name containing the transaction data.
+        input_df (DataFrame): The input DataFrame containing the data to be processed.
         support_thresholds (list): List of minimum support values to be used in the Apriori algorithm.
         departments (list): List of department codes to be processed. If run_mode is "separate", each department is processed separately.
         run_mode (str): The running mode. Should be either "separate" or "together", depending on whether the departments are processed separately or together.
@@ -385,9 +389,9 @@ def execute_tool(input_filename, support_thresholds, departments, run_mode, outp
     log_entries = []
 
     if run_mode == "separate":
-        results, log_entries = run_separate_mode(departments, support_thresholds, input_filename, output_path, run_mode)
+        results, log_entries = run_separate_mode(departments, support_thresholds, input_df, output_path, run_mode)
     elif run_mode == "together":
-        results, log_entries = run_together_mode(departments, support_thresholds, input_filename, output_path, run_mode)
+        results, log_entries = run_together_mode(departments, support_thresholds, input_df, output_path, run_mode)
 
     log_filepath = path.join(output_path, "run_log.txt")
     with open(log_filepath, 'w') as log_file:

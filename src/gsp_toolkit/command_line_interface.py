@@ -3,6 +3,8 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 from sys import argv, exit
 from webbrowser import open
 from gsp_algorithm import execute_tool
+import pandas as pd
+from utils import preprocess_time
 
 def print_introduction():
     introduction_text = """
@@ -38,14 +40,14 @@ def main():
     parser = ArgumentParser(description="Run the Apriori algorithm on transaction data. Analyze course sequences to identify common paths taken by students.",
                                      formatter_class=RawTextHelpFormatter,
                                      epilog="""Examples:
-    python gui.py --input_file data.csv --support_thresholds 50,100 --departments BISC,CHEM --run_mode separate
-    python gui.py --input_file data.csv --support_thresholds 75 --departments MATH,PHYS --run_mode together --output_dir results/
+    python gui.py --input_file data.csv --support_thresholds 50,100 --categories BISC,CHEM --run_mode separate
+    python gui.py --input_file data.csv --support_thresholds 75 --categories MATH,PHYS --run_mode together --output_dir results/
 
 For more detailed examples, use --manual.""")
 
     parser.add_argument("--input_file", required=True, help="Path to the input CSV file. Ensure the file is in CSV format.")
     parser.add_argument("--support_thresholds", required=True, help="Comma-separated list of support thresholds. Example: 50,100")
-    parser.add_argument("--departments", required=True, help="Comma-separated list of department codes. Include departments like BIO,CHEM.")
+    parser.add_argument("--categories", required=False, help="Comma-separated list of categories. For departments, this is like BIO,CHEM.")
     parser.add_argument("--run_mode", choices=['separate', 'together'], required=False, default='separate', help="Run mode: 'separate' for analyzing departments separately, 'together' for combined analysis. Defaults to 'separate'.")
     parser.add_argument("--output_dir", required=False, default=getcwd(), help="Directory to store output results. Defaults to current working directory if not specified.")
 
@@ -54,10 +56,17 @@ For more detailed examples, use --manual.""")
 
     # Convert string inputs to the correct format
     support_thresholds = [float(threshold) for threshold in args.support_thresholds.split(",")]
-    departments = args.departments.split(",")
+
+    if args.categories:
+        categories = args.categories.split(",")
+    else:
+        categories = []
+
+    df = pd.read_csv(args.input_file)
+    cleaned_df = preprocess_time(df)
 
     # Execute the tool with the provided arguments
-    execute_tool(args.input_file, support_thresholds, departments, args.run_mode, args.output_dir)
+    execute_tool(cleaned_df, support_thresholds, categories, args.run_mode, args.output_dir)
 
 if __name__ == "__main__":
     main()

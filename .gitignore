@@ -1,5 +1,5 @@
 # Byte-compiled / optimized / DLL files
-__pycache__/
+**/__pycache__/
 *.py[cod]
 *.so
 
@@ -14,6 +14,7 @@ dist/
 
 # macOS specific files
 .DS_Store
+**/.DS_Store
 
 # Ignore logs, coverage reports, and other temporary files
 *.log
@@ -36,6 +37,8 @@ htmlcov/
 .cache
 coverage.xml
 
-# Ignore tests folder
+# Ignore tests, output, and data directories
 tests/
-
+output/
+data/
+*.csv
