@@ -5,8 +5,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, ttk
 import pandas as pd
-from gsp_algorithm import execute_tool
-from data_processing import data_cleanup
+from gsp_algorithm import execute_tool, set_course_data
 from utils import ToolTip, get_data_dictionary, preprocess_time, get_timegroup_unit, create_timegroup, parse_dates
 from os import path, makedirs
 
@@ -15,6 +14,7 @@ class GSPTool:
         self.root = root
         self.file_df = None
         self.results = None
+        self.is_course_data = True
         self.concurrent_var = tk.IntVar()  # Future option for toggling concurrency
         output_path = path.join(path.dirname(__file__), '..', '..', 'output')
         makedirs(path.dirname(output_path), exist_ok=True)
@@ -29,33 +29,42 @@ class GSPTool:
         self.progress = ttk.Progressbar(root, mode='indeterminate')
         self.setup_gui()
 
+    def toggle_course_data(self):
+        self.is_course_data = self.course_data_var.get()
+        set_course_data(self.is_course_data)
+
     def setup_gui(self):
-        tk.Label(self.root, text="Input File Name:").grid(row=0, column=0, sticky=tk.W)
+        # Add a checkbox for "course data"
+        self.course_data_var = tk.BooleanVar(value=self.is_course_data)
+        self.course_data_checkbox = tk.Checkbutton(self.root, text="Course Data", variable=self.course_data_var, command=self.toggle_course_data)
+        self.course_data_checkbox.grid(row=0, column=0, sticky=tk.W)
+
+        tk.Label(self.root, text="Input File Name:").grid(row=1, column=0, sticky=tk.W)
         input_file_name_entry = tk.Entry(self.root, textvariable=self.input_file_name)
-        input_file_name_entry.grid(row=0, column=1)
-        tk.Button(self.root, text="Browse", command=self.browse_file).grid(row=0, column=2)
+        input_file_name_entry.grid(row=1, column=1)
+        tk.Button(self.root, text="Browse", command=self.browse_file).grid(row=1, column=2)
         self.bind_tooltip_events(input_file_name_entry, "Enter the path of the input file containing transaction data.")
 
-        tk.Label(self.root, text="Minimum Support(s):").grid(row=1, column=0, sticky=tk.W)
+        tk.Label(self.root, text="Minimum Support(s):").grid(row=2, column=0, sticky=tk.W)
         self.min_supports_entry = tk.Entry(self.root)
-        self.min_supports_entry.grid(row=1, column=1)
+        self.min_supports_entry.grid(row=2, column=1)
         self.bind_tooltip_events(self.min_supports_entry, "Enter the minimum support(s) as comma-separated values.")
 
         # Concurrency checkbox
         self.concurrent_checkbox = tk.Checkbutton(self.root, text="Enable Concurrency", variable=self.concurrent_var, command=self.toggle_concurrency)
-        self.concurrent_checkbox.grid(row=2, column=0, sticky=tk.W)
+        self.concurrent_checkbox.grid(row=3, column=0, sticky=tk.W)
 
         # Dynamically set the label to "Departments" for course-related data or "Category" for general data
         self.category_label = tk.Label(self.root, text=self.category_label_str + "(s):")
-        self.category_label.grid(row=3, column=0, sticky=tk.W)
+        self.category_label.grid(row=4, column=0, sticky=tk.W)
 
         self.categories_listbox = tk.Listbox(self.root, selectmode=tk.MULTIPLE)
-        self.categories_listbox.grid(row=3, column=1)
+        self.categories_listbox.grid(row=4, column=1)
         self.categories_listbox.bind('<<ListboxSelect>>', self.update_radio_buttons_state)
         self.bind_tooltip_events(self.categories_listbox, f"Select one or more {self.category_label_str.lower()}(s) for the GSP algorithm.")
 
         button_frame = tk.Frame(self.root)
-        button_frame.grid(row=3, column=2, padx=10)
+        button_frame.grid(row=4, column=2, padx=10)
 
         # Switch to using grid() for the checkbutton and radio buttons
         self.select_all_checkbox = tk.Checkbutton(button_frame, text="Select All", variable=self.select_all_var, command=self.select_all_categories)
@@ -74,9 +83,9 @@ class GSPTool:
         self.output_directory_label.grid(row=4, column=1)
         self.bind_tooltip_events(self.output_directory_label, "Specify the output directory for the algorithm results.")
 
-        tk.Button(self.root, text="Browse", command=self.set_output_directory).grid(row=4, column=2)
-        tk.Button(self.root, text="Run GSP", command=self.run_gsp).grid(row=5, column=0, pady=10)
-        tk.Button(self.root, text="Help", command=self.open_web).grid(row=5, column=2)
+        tk.Button(self.root, text="Browse", command=self.set_output_directory).grid(row=5, column=2)
+        tk.Button(self.root, text="Run GSP", command=self.run_gsp).grid(row=6, column=0, pady=10)
+        tk.Button(self.root, text="Help", command=self.open_web).grid(row=6, column=2)
 
         self.run_status_label = tk.Label(self.root, text="")
         self.run_status_label.grid(row=5, column=1)
@@ -214,7 +223,7 @@ class GSPTool:
         print(f"Selected categories: {selected_categories}")
         print(f"All categories: {self.categories}")
 
-        if not selected_categories and len(self.categories) != 0:
+        if not selected_categories and len(self.categories) != 0 and self.is_course_data:
             tk.messagebox.showwarning("No categories selected", "Please select at least one category to run GSP.")
         elif not self.min_supports_entry.get():
             tk.messagebox.showwarning("No minimum supports", "Please specify at least one minimum support value.")

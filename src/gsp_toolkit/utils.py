@@ -124,11 +124,11 @@ def create_timegroup(df, time_column, timegroup_unit):
     if timegroup_unit == 'Y':
         df['TimeGroup'] = df[time_column].dt.year
     elif timegroup_unit == 'M':
-        df['TimeGroup'] = df[time_column].dt.month
+        df['TimeGroup'] = df[time_column].dt.year * 100 + df[time_column].dt.month
     elif timegroup_unit == 'W':
-        df['TimeGroup'] = df[time_column].dt.isocalendar().week
+        df['TimeGroup'] = df[time_column].dt.isocalendar().year * 100 + df[time_column].dt.isocalendar().week
     elif timegroup_unit == 'Q':
-        df['TimeGroup'] = df[time_column].dt.quarter
+        df['TimeGroup'] = df[time_column].dt.year * 10 + df[time_column].dt.quarter
     else:
         raise ValueError(f"Unsupported time group unit: {timegroup_unit}")
     

@@ -5,6 +5,13 @@ from datetime import datetime
 from data_processing import dataframe_gen
 from utils import filter_and_export_to_csv, export_summary_to_file, generate_hash
 
+is_course_data = True
+
+'''pass the flag from the gui'''
+def set_course_data(value):
+    global is_course_data
+    is_course_data = value
+
 def join_itemsets(itemset):
     """
     Perform the join operation of the Apriori algorithm by comparing different itemsets.
@@ -304,7 +311,7 @@ def run_separate_mode(departments, min_supports, input_df, output_path, run_mode
     export_dict = {}
     log_entries = []
 
-    all_data = dataframe_gen(input_df, departments, run_mode_var, output_path)
+    all_data = dataframe_gen(input_df, departments, run_mode_var, output_path, is_course_data)
 
     for department in departments:
         department_folder = path.join(output_path, department)
@@ -348,7 +355,7 @@ def run_together_mode(departments, min_supports, input_df, output_path, run_mode
     department_folder = path.join(output_path, department_folder_name)
     makedirs(department_folder, exist_ok=True)
 
-    transactions, df, new_df = dataframe_gen(input_df, departments, run_mode_var, department_folder)
+    transactions, df, new_df = dataframe_gen(input_df, departments, run_mode_var, department_folder, is_course_data)
 
     for minsupport in min_supports:
         start_time = time.time()

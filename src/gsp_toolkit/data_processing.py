@@ -2,10 +2,7 @@ from os import path, getcwd
 import pandas as pd
 from utils import get_data_dictionary
 
-def data_cleanup(input_file_path):
-    return
-
-def dataframe_gen(df, departments, run_mode, department_folder):
+def dataframe_gen(df, departments, run_mode, department_folder, is_course_data):
     """
     Generate a DataFrame from the input CSV file and filter based on departments and run mode.
 z
@@ -22,18 +19,20 @@ z
         """Process the data specific to a department, including sorting and resetting the index."""
         df = df.reset_index(drop=True)
 
+        '''
         # assume TermOrder format is 'YYYYX' where X is the semester number
-        df['Year'] = df['TermOrder'].astype(str).str[:-1].astype(int)  # Extract the year
-        df['Semester'] = df['TermOrder'].astype(str).str[-1].astype(int)  # Extract the semester digit
+        df['Year'] = df['TimeGroup'].astype(str).str[:-1].astype(int)  # Extract the year
+        df['Semester'] = df['TimeGroup'].astype(str).str[-1].astype(int)  # Extract the semester digit
+        '''
 
         # sort by Year first, then Semester, and finally CourseCode
-        sorted_df = df.sort_values(by=['Year', 'Semester', 'CourseCode'], ascending=[True, True, True])
+        sorted_df = df.sort_values(by=['Year', 'Semester', 'Item'], ascending=[True, True, True])
         # Now, we can do operations like filtering by year or grouping by semester
         
         # Group by ID, collecting the CourseCode and TermOrder sequences
         sorted_df = sorted_df.groupby(['ID']).agg({
-            'CourseCode': lambda x: list(x),
-            'TermOrder': lambda x: list(x),
+            'Item': lambda x: list(x),
+            'TimeGroup': lambda x: list(x),
         }).reset_index()
 
         sorted_df = sorted_df.drop(columns=['ID'])
@@ -44,9 +43,25 @@ z
 
         return transactions, sorted_df, delimitor_df
 
-    df = df.loc[df['CourseCode'].str[:4].isin(departments)]
+    def process_general_data(df, department_folder):
+        df = df.reset_index(drop=True)
+        sorted_df = df.sort_values(by="TimeGroup")
+        sorted_df = df.groupby('ID').agg({
+            'Item': lambda x: list(x), 
+            'TimeGroup': lambda x: list(x),
+        }).reset_index()
+        sorted_df = sorted_df.drop(columns=['ID'])
 
-    if run_mode == "separate":
+        transactions = len(sorted_df.index) + 1
+        delimitor_df = insert_delimitor(sorted_df, department_folder)
+
+        return transactions, sorted_df, delimitor_df
+
+    df = df.loc[df['Item'].str[:4].isin(departments)]
+
+    if not is_course_data:
+        return process_general_data(df, department_folder)
+    elif run_mode == "separate":
         results = {}
         for department in departments:
             dfSub = df.loc[(df['Department'] == department)]
@@ -66,8 +81,8 @@ def insert_delimitor(df, department_folder):
     Returns:
         list: List of course codes with inserted delimiters.
     """
-    course = [str(i).strip("[]").split(", ") for i in df.CourseCode]
-    semester = [str(i).strip("[]").split(", ") for i in df.TermOrder]
+    course = [str(i).strip("[]").split(", ") for i in df.Item]
+    semester = [str(i).strip("[]").split(", ") for i in df.TimeGroup]
 
     K_itemset = []
     updated_elem1 = []
@@ -101,7 +116,7 @@ def insert_delimitor(df, department_folder):
             K_itemset.append(item)
             updated_elem1.clear()
     
-    d = {'CourseCode': K_itemset}
+    d = {'Item': K_itemset}
     new_df = pd.DataFrame(d)
     
     transactions_delimiter_file_path = path.join(department_folder, 'transactions_delimiter.csv')
